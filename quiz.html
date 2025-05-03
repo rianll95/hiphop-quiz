@@ -1,0 +1,433 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🎤 Quiz de Hip-Hop</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at center, #0a0a0a, #000);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .quiz-box {
+      background: #111;
+      padding: 30px;
+      border-radius: 20px;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 0 25px #00f6ff88;
+      text-align: center;
+      border: 2px solid #00f6ff;
+    }
+
+    .progress-container {
+      width: 100%;
+      background-color: #0a0a0a;
+      border: 2px solid #00f6ff;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      height: 20px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background-color: #00ff55;
+      width: 0%;
+      border-radius: 8px;
+      transition: width 0.3s ease;
+    }
+
+    .question {
+      font-size: 20px;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+
+    .options button {
+      background-color: #0a0a0a;
+      color: white;
+      border: 2px solid #00f6ff;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.3s ease;
+      font-size: 16px;
+    }
+
+    .options button:hover {
+      background-color: #111;
+    }
+
+    .options .selected {
+      background-color: #001e1e;
+      border: 2px solid #00ff55;
+    }
+
+    .options .correct {
+      background-color: #003300;
+      border: 2px solid #00ff55;
+    }
+
+    #confirmBtn {
+      background-color: #000;
+      color: white;
+      border: 2px solid #00ff55;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      font-weight: bold;
+      font-size: 16px;
+      transition: all 0.4s ease;
+      animation: pulse 2s infinite;
+    }
+
+    #confirmBtn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      animation: none;
+    }
+
+    #confirmBtn:hover:not(:disabled) {
+      background-color: #003300;
+    }
+
+    #hint {
+      background-color: #001e1e;
+      border: 2px solid #00ff55;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      color: #00f6ff;
+      display: none;
+    }
+
+    #nextBtn {
+      background-color: #000;
+      color: white;
+      border: 2px solid #00f6ff;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      font-weight: bold;
+      font-size: 16px;
+      display: none;
+    }
+
+    #nextBtn:hover {
+      background-color: #003300;
+    }
+
+    #aiHelpBtn {
+      background-color: #000;
+      color: white;
+      border: 2px solid #ff3333;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    #aiHelpBtn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #aiHelpBtn:hover:not(:disabled) {
+      background-color: #330000;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 5px #00ff55; }
+      50% { box-shadow: 0 0 20px #00ff55; }
+      100% { box-shadow: 0 0 5px #00ff55; }
+    }
+
+    .start-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    input[type="text"] {
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      width: 100%;
+      font-size: 16px;
+    }
+
+    #startBtn {
+      padding: 12px;
+      background-color: #000;
+      color: white;
+      border: 2px solid #00ff55;
+      font-weight: bold;
+      font-size: 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      animation: pulse 2s infinite;
+      width: 100%;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="start-screen" id="startScreen">
+    <input type="text" id="username" placeholder="Insira seu nome..." />
+    <button id="startBtn">Começar Quiz</button>
+  </div>
+
+  <div class="quiz-box hidden" id="quizBox">
+    <h1>🎤 Quiz de Hip-Hop</h1>
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="question" id="question">Carregando...</div>
+    <div class="options" id="options"></div>
+    <div id="hint"></div>
+    <button id="confirmBtn" disabled>Confirmar</button>
+    <button id="nextBtn">Próxima Pergunta</button>
+    <button id="aiHelpBtn">Ajuda com I.A ⚡ (10 usos restantes)</button>
+  </div>
+
+  <script>
+    // Banco de perguntas
+    const allQuestions = [
+      { q: "Quem é conhecido como 'o pai do Hip-Hop'?", o: ["Tupac", "DJ Kool Herc", "Dr. Dre", "Notorious B.I.G"], a: 1, hint: "DJ Kool Herc é considerado o pai do Hip-Hop por organizar as primeiras festas de rua no Bronx, Nova York, nos anos 70, onde o gênero nasceu." },
+      { q: "Qual cidade é considerada o berço do Hip-Hop?", o: ["Los Angeles", "Chicago", "Nova York", "Atlanta"], a: 2, hint: "Nova York, especialmente o Bronx, é o berço do Hip-Hop, onde o gênero emergiu nas festas de rua dos anos 70." },
+      { q: "Quem fundou a Death Row Records?", o: ["Jay-Z", "Dr. Dre", "Suge Knight", "Nas"], a: 2, hint: "Suge Knight fundou a Death Row Records junto com Dr. Dre, mas Suge é o principal nome associado à fundação." },
+      { q: "Qual rapper ficou famoso com a música 'Juicy'?", o: ["2Pac", "Eminem", "Biggie", "Snoop Dogg"], a: 2, hint: "Biggie, também conhecido como Notorious B.I.G, lançou 'Juicy' em 1994, um marco na sua carreira." },
+      { q: "Quem foi o primeiro rapper a ganhar um Grammy?", o: ["Kanye West", "Snoop Dogg", "Dr. Dre", "Will Smith"], a: 3, hint: "Will Smith, como parte do duo DJ Jazzy Jeff & The Fresh Prince, ganhou o primeiro Grammy de rap em 1989 com 'Parents Just Don't Understand'." },
+      { q: "Qual rapper é conhecido pelo alter ego 'Slim Shady'?", o: ["Jay-Z", "Eminem", "Nas", "Lil Wayne"], a: 1, hint: "Eminem criou o alter ego Slim Shady para expressar um lado mais sombrio e humorístico em suas letras." },
+      { q: "O que significa o termo 'freestyle'?", o: ["Rimando de improviso", "Cantar com melodia", "Estilo de dança", "Competição de rap"], a: 0, hint: "'Freestyle' no Hip-Hop significa rimar de improviso, criando versos na hora sem preparação." },
+      { q: "Qual grupo lançou o álbum 'Straight Outta Compton'?", o: ["Wu-Tang Clan", "Run-D.M.C.", "N.W.A", "Beastie Boys"], a: 2, hint: "N.W.A lançou 'Straight Outta Compton' em 1988, um álbum icônico do gangsta rap." },
+      { q: "Quem foi o rapper que popularizou o estilo 'gangsta rap'?", o: ["Dr. Dre", "Ice Cube", "Snoop Dogg", "Eazy-E"], a: 3, hint: "Eazy-E, como líder do N.W.A, foi fundamental para popularizar o gangsta rap com letras sobre a vida nas ruas." },
+      { q: "Quem é o rapper conhecido como 'O Rei do Rap'?", o: ["Jay-Z", "Nas", "Eminem", "Kendrick Lamar"], a: 0, hint: "Jay-Z é frequentemente chamado de 'O Rei do Rap' devido à sua longevidade e influência no gênero." },
+      { q: "Qual rapper lançou o álbum 'Illmatic'?", o: ["Nas", "Jay-Z", "Tupac", "Biggie"], a: 0, hint: "Nas lançou 'Illmatic' em 1994, um dos álbuns mais aclamados da história do Hip-Hop." },
+      { q: "Quem é conhecido por popularizar o 'trap'?", o: ["T.I.", "Lil Wayne", "Kanye West", "Drake"], a: 0, hint: "T.I. é creditado por popularizar o trap com álbuns como 'Trap Muzik' (2003), focando em temas de rua e batidas pesadas." },
+      { q: "Qual grupo é famoso pelo álbum 'Enter the Wu-Tang (36 Chambers)'?", o: ["N.W.A", "Wu-Tang Clan", "Run-D.M.C.", "Public Enemy"], a: 1, hint: "Wu-Tang Clan lançou 'Enter the Wu-Tang (36 Chambers)' em 1993, um clássico que apresentou seu estilo único." },
+      { q: "Quem lançou a música 'Lose Yourself'?", o: ["Eminem", "50 Cent", "Dr. Dre", "Kanye West"], a: 0, hint: "Eminem lançou 'Lose Yourself' em 2002, uma música motivacional do filme '8 Mile'." },
+      { q: "Qual rapper é conhecido como 'Yeezy'?", o: ["Jay-Z", "Kanye West", "Lil Wayne", "Drake"], a: 1, hint: "Kanye West é chamado de 'Yeezy', um apelido que também deu nome à sua linha de tênis." },
+      { q: "Qual é o nome do primeiro álbum de Tupac?", o: ["Me Against the World", "All Eyez on Me", "2Pacalypse Now", "Strictly 4 My N.I.G.G.A.Z."], a: 2, hint: "Tupac lançou '2Pacalypse Now' em 1991 como seu primeiro álbum, abordando questões sociais." },
+      { q: "Quem é o fundador da Roc-A-Fella Records?", o: ["Jay-Z", "Diddy", "Dr. Dre", "Suge Knight"], a: 0, hint: "Jay-Z fundou a Roc-A-Fella Records em 1995 com Damon Dash e Kareem Burke para lançar seus projetos." },
+      { q: "Qual rapper é conhecido por 'Hotline Bling'?", o: ["Drake", "Kendrick Lamar", "J. Cole", "Chance the Rapper"], a: 0, hint: "Drake lançou 'Hotline Bling' em 2015, um hit que mistura rap e R&B." },
+      { q: "Qual grupo lançou 'Rapper's Delight'?", o: ["Sugarhill Gang", "Run-D.M.C.", "Beastie Boys", "Public Enemy"], a: 0, hint: "Sugarhill Gang lançou 'Rapper's Delight' em 1979, uma das primeiras músicas de rap a alcançar sucesso mainstream." },
+      { q: "Quem venceu o Pulitzer por 'DAMN.'?", o: ["Kendrick Lamar", "Jay-Z", "Nas", "Kanye West"], a: 0, hint: "Kendrick Lamar venceu o Pulitzer em 2018 por 'DAMN., sendo o primeiro rapper a receber o prêmio." },
+      { q: "Qual rapper é conhecido como 'Hova'?", o: ["Jay-Z", "Nas", "Tupac", "Biggie"], a: 0, hint: "Jay-Z é conhecido como 'Hova', uma abreviação de 'Jehovah', refletindo sua autoproclamada grandeza." },
+      { q: "Quem lançou o álbum 'The Chronic'?", o: ["Dr. Dre", "Snoop Dogg", "Ice Cube", "Eminem"], a: 0, hint: "Dr. Dre lançou 'The Chronic' em 1992, um marco no rap da Costa Oeste." },
+      { q: "Qual grupo é conhecido por 'Fight the Power'?", o: ["Public Enemy", "N.W.A", "Run-D.M.C.", "Beastie Boys"], a: 0, hint: "Public Enemy lançou 'Fight the Power' em 1989, uma música de protesto icônica." },
+      { q: "Quem é o rapper por trás de 'My Name Is'?", o: ["Eminem", "Lil Wayne", "50 Cent", "Kanye West"], a: 0, hint: "Eminem lançou 'My Name Is' em 1999, introduzindo Slim Shady ao mundo." },
+      { q: "Qual rapper fundou a Bad Boy Records?", o: ["Jay-Z", "Diddy", "Dr. Dre", "Suge Knight"], a: 1, hint: "Diddy, também conhecido como Puff Daddy, fundou a Bad Boy Records em 1993." },
+      { q: "Quem é conhecido por 'Gold Digger'?", o: ["Kanye West", "Jay-Z", "Drake", "Lil Wayne"], a: 0, hint: "Kanye West lançou 'Gold Digger' em 2005, com participação de Jamie Foxx." },
+      { q: "Qual rapper é de Compton e fez parte do N.W.A?", o: ["Snoop Dogg", "Ice Cube", "Tupac", "Nas"], a: 1, hint: "Ice Cube, nascido em Compton, foi um dos membros fundadores do N.W.A." },
+      { q: "Quem lançou 'Ready to Die'?", o: ["Biggie", "Tupac", "Nas", "Jay-Z"], a: 0, hint: "Biggie, ou Notorious B.I.G., lançou 'Ready to Die' em 1994, seu álbum de estreia." },
+      { q: "Qual rapper é conhecido por 'In Da Club'?", o: ["50 Cent", "Eminem", "Dr. Dre", "Snoop Dogg"], a: 0, hint: "50 Cent lançou 'In Da Club' em 2003, um dos maiores hits da sua carreira." },
+      { q: "Quem é o autor de 'Alright'?", o: ["Kendrick Lamar", "J. Cole", "Drake", "Chance the Rapper"], a: 0, hint: "Kendrick Lamar lançou 'Alright' em 2015, uma música de protesto e esperança." }
+    ];
+
+    // Embaralha e seleciona 20 perguntas
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    const quiz = shuffleArray([...allQuestions]).slice(0, 20);
+
+    let currentQuestion = 0;
+    let score = 0;
+    let selectedOption = null;
+    let userName = "";
+    let aiHelpsRemaining = 10;
+    let usedAIThisQuestion = false;
+
+    const startScreen = document.getElementById('startScreen');
+    const quizBox = document.getElementById('quizBox');
+    const questionEl = document.getElementById('question');
+    const optionsEl = document.getElementById('options');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const aiHelpBtn = document.getElementById('aiHelpBtn');
+    const hintEl = document.getElementById('hint');
+    const startBtn = document.getElementById('startBtn');
+    const usernameInput = document.getElementById('username');
+    const progressBar = document.getElementById('progressBar');
+
+    function updateAIHelpButton() {
+      aiHelpBtn.textContent = `Ajuda com I.A ⚡ (${aiHelpsRemaining} usos restantes)`;
+      if (aiHelpsRemaining <= 0) {
+        aiHelpBtn.disabled = true;
+      }
+    }
+
+    function startQuiz() {
+      if (!usernameInput.value.trim()) {
+        alert("Por favor, insira seu nome!");
+        return;
+      }
+      userName = usernameInput.value.trim();
+      startScreen.classList.add('hidden');
+      quizBox.classList.remove('hidden');
+      updateAIHelpButton();
+      loadQuestion();
+    }
+
+    function loadQuestion() {
+      selectedOption = null;
+      usedAIThisQuestion = false;
+      confirmBtn.disabled = true;
+      hintEl.style.display = 'none';
+      nextBtn.style.display = 'none';
+      confirmBtn.style.display = 'block';
+      aiHelpBtn.style.display = 'block';
+      const currentQuiz = quiz[currentQuestion];
+      questionEl.textContent = currentQuiz.q;
+      optionsEl.innerHTML = '';
+      currentQuiz.o.forEach((option, index) => {
+        const button = document.createElement('button');
+        button.textContent = option;
+        button.addEventListener('click', () => selectOption(index));
+        optionsEl.appendChild(button);
+      });
+      updateProgressBar();
+    }
+
+    function selectOption(index) {
+      selectedOption = index;
+      const buttons = optionsEl.querySelectorAll('button');
+      buttons.forEach((btn, i) => {
+        btn.classList.remove('selected');
+        if (i === index) btn.classList.add('selected');
+      });
+      confirmBtn.disabled = false;
+    }
+
+    function updateProgressBar() {
+      const progress = ((currentQuestion + 1) / quiz.length) * 100;
+      progressBar.style.width = `${progress}%`;
+    }
+
+    function useAIHelp() {
+      if (aiHelpsRemaining <= 0 || usedAIThisQuestion) return;
+      usedAIThisQuestion = true;
+      aiHelpsRemaining--;
+      updateAIHelpButton();
+      const currentQuiz = quiz[currentQuestion];
+      const buttons = optionsEl.querySelectorAll('button');
+      buttons.forEach((btn, i) => {
+        btn.disabled = true;
+        if (i === currentQuiz.a) {
+          btn.classList.add('correct');
+        }
+      });
+      selectedOption = currentQuiz.a;
+      confirmBtn.disabled = false;
+    }
+
+    function confirmAnswer() {
+      if (selectedOption === null) return;
+      const currentQuiz = quiz[currentQuestion];
+      const wasCorrect = selectedOption === currentQuiz.a;
+      if (wasCorrect) {
+        score++;
+      }
+      const buttons = optionsEl.querySelectorAll('button');
+      buttons.forEach(btn => btn.disabled = true);
+      hintEl.textContent = `Dica: ${currentQuiz.hint}`;
+      hintEl.style.display = 'block';
+      confirmBtn.style.display = 'none';
+      aiHelpBtn.style.display = 'none';
+      nextBtn.style.display = 'block';
+    }
+
+    function nextQuestion() {
+      currentQuestion++;
+      if (currentQuestion < quiz.length) {
+        loadQuestion();
+      } else {
+        endGame();
+      }
+    }
+
+    function endGame() {
+      confirmBtn.style.display = 'none';
+      nextBtn.style.display = 'none';
+      aiHelpBtn.style.display = 'none';
+      hintEl.style.display = 'none';
+      questionEl.textContent = `Quiz concluído, ${userName}! Sua pontuação: ${score}/20`;
+      optionsEl.innerHTML = '';
+    }
+
+    startBtn.addEventListener('click', startQuiz);
+    confirmBtn.addEventListener('click', confirmAnswer);
+    nextBtn.addEventListener('click', nextQuestion);
+    aiHelpBtn.addEventListener('click', useAIHelp);
+  </script>
+</body>
+</html>
